@@ -138,6 +138,11 @@ func newDeploymentForCR(cr *customdeploymentv1alpha1.CustomDeployment) *appsv1.D
 	labels := map[string]string{
 		"k8s-app": cr.Name,
 	}
+	selector := metav1.LabelSelector{
+		MatchLabels: map[string]string{
+			"k8s-app": cr.Name,
+		},
+	}
 	var replicas int32 = 10
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{
@@ -147,6 +152,7 @@ func newDeploymentForCR(cr *customdeploymentv1alpha1.CustomDeployment) *appsv1.D
 		},
 		Spec: appsv1.DeploymentSpec{
 			Replicas: &replicas,
+			Selector: &selector,
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      cr.Name + "-pod",
