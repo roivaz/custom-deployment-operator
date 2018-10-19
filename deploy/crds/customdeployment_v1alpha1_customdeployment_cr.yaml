@@ -1,0 +1,7 @@
+apiVersion: customdeployment.lominorama.com/v1alpha1
+kind: CustomDeployment
+metadata:
+  name: example-customdeployment
+spec:
+  # Add fields here
+  size: 3
