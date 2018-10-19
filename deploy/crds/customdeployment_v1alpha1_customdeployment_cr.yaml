@@ -3,5 +3,5 @@ kind: CustomDeployment
 metadata:
   name: example-customdeployment
 spec:
-  # Add fields here
-  size: 3
+  image: nginx
+  version: latest
