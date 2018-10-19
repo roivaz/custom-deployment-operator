@@ -117,12 +117,14 @@ func (r *ReconcileCustomDeployment) Reconcile(request reconcile.Request) (reconc
 		log.Printf("Creating a new Deployment %s/%s\n", deployment.Namespace, deployment.Name)
 		err = r.client.Create(context.TODO(), deployment)
 		if err != nil {
+			log.Print(err)
 			return reconcile.Result{}, err
 		}
 
 		// Deployment created successfully - don't requeue
 		return reconcile.Result{}, nil
 	} else if err != nil {
+		log.Print(err)
 		return reconcile.Result{}, err
 	}
 
