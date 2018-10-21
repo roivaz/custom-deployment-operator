@@ -4,13 +4,13 @@ import (
 	"context"
 	"log"
 
+	"github.com/davecgh/go-spew/spew"
 	customdeploymentv1alpha1 "github.com/lominorama/custom-deployment-operator/pkg/apis/customdeployment/v1alpha1"
 	appsv1 "k8s.io/api/apps/v1"
-	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes/scheme"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -55,13 +55,13 @@ func add(mgr manager.Manager, r reconcile.Reconciler) error {
 	// This is required so the controller can detect changes on the created deployments
 	// and enforce the desired state on them. For example if someone manually changes something in
 	// the deployment, this will notice it and trigger the reconciliation loop
-	err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
-		IsController: true,
-		OwnerType:    &customdeploymentv1alpha1.CustomDeployment{},
-	})
-	if err != nil {
-		return err
-	}
+	// err = c.Watch(&source.Kind{Type: &appsv1.Deployment{}}, &handler.EnqueueRequestForOwner{
+	// 	IsController: true,
+	// 	OwnerType:    &customdeploymentv1alpha1.CustomDeployment{},
+	// })
+	// if err != nil {
+	// 	return err
+	// }
 
 	return nil
 }
@@ -128,51 +128,70 @@ func (r *ReconcileCustomDeployment) Reconcile(request reconcile.Request) (reconc
 		return reconcile.Result{}, err
 	}
 
-	// Deployment already exists - don't requeue
-	log.Printf("Skip reconcile: Deployment %s/%s already exists", found.Namespace, found.Name)
+	// Deployment already exists - update
+	log.Printf("Updating deployment %s/%s", deployment.Namespace, deployment.Name)
+	err = r.client.Update(context.TODO(), deployment)
+	if err != nil {
+		log.Print(err)
+		return reconcile.Result{}, err
+	}
+
 	return reconcile.Result{}, nil
 }
 
 // newPodForCR returns a busybox pod with the same name/namespace as the cr
 func newDeploymentForCR(cr *customdeploymentv1alpha1.CustomDeployment) *appsv1.Deployment {
+
+	var yaml = `
+    apiVersion: apps/v1
+    kind: Deployment
+    metadata:
+      name: placeholder
+      namespace: placeholder
+      labels:
+        k8s-app: placeholder
+    spec:
+      selector:
+        matchLabels:
+          k8s-app: placeholder
+      replicas: 4
+      template:
+        metadata:
+          labels:
+            k8s-app: placeholder
+        spec:
+          containers:
+          - name: placeholder
+            image: placeholder
+            ports:
+            - containerPort: 80
+            resources:
+              requests:
+                cpu: 100m
+    `
+
+	decode := scheme.Codecs.UniversalDeserializer().Decode
+	obj, _, err := decode([]byte(yaml), nil, nil)
+	if err != nil {
+		log.Printf("%#v", err)
+	}
+	deployment := obj.(*appsv1.Deployment)
+	spew.Dump(deployment)
+
 	labels := map[string]string{
 		"k8s-app": cr.Name,
 	}
-	selector := metav1.LabelSelector{
-		MatchLabels: map[string]string{
-			"k8s-app": cr.Name,
-		},
-	}
-	var replicas int32 = 10
-	return &appsv1.Deployment{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      cr.Name + "-deployment",
-			Namespace: cr.Namespace,
-			Labels:    labels,
-		},
-		Spec: appsv1.DeploymentSpec{
-			Replicas: &replicas,
-			Selector: &selector,
-			Template: corev1.PodTemplateSpec{
-				ObjectMeta: metav1.ObjectMeta{
-					Name:      cr.Name + "-pod",
-					Namespace: cr.Namespace,
-					Labels:    labels,
-				},
-				Spec: corev1.PodSpec{
-					Containers: []corev1.Container{
-						{
-							Name:  cr.Name,
-							Image: cr.Spec.Image + ":" + cr.Spec.Version,
-							// Resources: corev1.ResourceRequirements{
-							// 	Requests: corev1.ResourceList{
-							// 		cpu: resource.ParseQuantity(cr.Spec.CpuRequest),
-							// 	},
-							// },
-						},
-					},
-				},
-			},
-		},
-	}
+
+	// Set customizable fields
+	deployment.ObjectMeta.Name = cr.Name + "-deployment"
+	deployment.ObjectMeta.Namespace = cr.Namespace
+	deployment.ObjectMeta.Labels = labels
+	deployment.Spec.Selector.MatchLabels = labels
+	deployment.Spec.Template.ObjectMeta.Labels = labels
+
+	// TODO: check that deployment definition only contains one container
+	deployment.Spec.Template.Spec.Containers[0].Name = cr.Name + "-pod"
+	deployment.Spec.Template.Spec.Containers[0].Image = cr.Spec.Image + ":" + cr.Spec.Version
+
+	return deployment
 }

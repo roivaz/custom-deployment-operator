@@ -6,8 +6,9 @@ import (
 
 // CustomDeploymentSpec defines the desired state of CustomDeployment
 type CustomDeploymentSpec struct {
-	Image   string `json:"image"`
-	Version string `json:"version"`
+	Image    string `json:"image"`
+	Version  string `json:"version"`
+	Replicas int32  `json:"replicas"`
 	// CpuRequest    string `json:"cpuRequest"`
 	// MemoryRequest string `json:"memoryRequest"`
 }
